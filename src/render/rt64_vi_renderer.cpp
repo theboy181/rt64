@@ -8,6 +8,16 @@
 #include "shared/rt64_video_interface.h"
 
 namespace RT64 {
+    static std::atomic<uint32_t> gCrtScanlinesEnabled = 1;
+
+    void setCrtScanlinesEnabled(bool enabled) {
+        gCrtScanlinesEnabled.store(enabled ? 1u : 0u, std::memory_order_relaxed);
+    }
+
+    bool getCrtScanlinesEnabled() {
+        return gCrtScanlinesEnabled.load(std::memory_order_relaxed) != 0;
+    }
+
     // VIRenderer
 
     VIRenderer::VIRenderer() { }
@@ -44,20 +54,40 @@ namespace RT64 {
     void VIRenderer::render(const RenderParams &p) {
         const ShaderRecord *shader = nullptr;
         const RenderSampler *sampler = nullptr;
-        switch (p.filtering) {
-        case UserConfiguration::Filtering::Nearest:
-            shader = &p.shaderLibrary->videoInterfaceNearest;
-            sampler = p.shaderLibrary->samplerLibrary.nearest.borderBorder.get();
-            break;
-        case UserConfiguration::Filtering::AntiAliasedPixelScaling:
-            shader = &p.shaderLibrary->videoInterfacePixel;
-            sampler = p.shaderLibrary->samplerLibrary.linear.borderBorder.get();
-            break;
-        case UserConfiguration::Filtering::Linear:
-        default:
-            shader = &p.shaderLibrary->videoInterfaceLinear;
-            sampler = p.shaderLibrary->samplerLibrary.linear.borderBorder.get();
-            break;
+        const bool crtEnabled = getCrtScanlinesEnabled();
+        if (crtEnabled) {
+            switch (p.filtering) {
+            case UserConfiguration::Filtering::AntiAliasedPixelScaling:
+                shader = &p.shaderLibrary->videoInterfacePixelCRT;
+                sampler = p.shaderLibrary->samplerLibrary.linear.borderBorder.get();
+                break;
+            case UserConfiguration::Filtering::Nearest:
+                shader = &p.shaderLibrary->videoInterfaceNearestCRT;
+                sampler = p.shaderLibrary->samplerLibrary.nearest.borderBorder.get();
+                break;
+            case UserConfiguration::Filtering::Linear:
+            default:
+                shader = &p.shaderLibrary->videoInterfaceLinearCRT;
+                sampler = p.shaderLibrary->samplerLibrary.linear.borderBorder.get();
+                break;
+            }
+        }
+        else {
+            switch (p.filtering) {
+            case UserConfiguration::Filtering::Nearest:
+                shader = &p.shaderLibrary->videoInterfaceNearest;
+                sampler = p.shaderLibrary->samplerLibrary.nearest.borderBorder.get();
+                break;
+            case UserConfiguration::Filtering::AntiAliasedPixelScaling:
+                shader = &p.shaderLibrary->videoInterfacePixel;
+                sampler = p.shaderLibrary->samplerLibrary.linear.borderBorder.get();
+                break;
+            case UserConfiguration::Filtering::Linear:
+            default:
+                shader = &p.shaderLibrary->videoInterfaceLinear;
+                sampler = p.shaderLibrary->samplerLibrary.linear.borderBorder.get();
+                break;
+            }
         }
 
         if ((descriptorSet == nullptr) || (descriptorSetSampler != sampler)) {
@@ -78,6 +108,9 @@ namespace RT64 {
         pushConstants.videoResolution = fbHdRegion;
         pushConstants.textureResolution = { float(p.textureWidth), float(p.textureHeight) };
         pushConstants.gamma = p.vi->gamma();
+        pushConstants.viFlags = crtEnabled ? 1u : 0u;
+        pushConstants.viFlagsPadding0 = 0;
+        pushConstants.viFlagsPadding1 = 0;
 
         p.commandList->setPipeline(shader->pipeline.get());
         p.commandList->setGraphicsPipelineLayout(shader->pipelineLayout.get());

@@ -161,7 +161,8 @@ namespace RT64 {
 
                     // Always default to interpolation being disabled for all modified framebuffers.
                     colorFb->interpolationEnabled = false;
-                    
+                    //presentationMode = EnhancementConfiguration::Presentation::Mode::SkipBuffering;
+
                     // When the skip buffering option is on, we check the video history to find if any of the framebuffers that
                     // were drawn in this frame have been previously used for presentation. This is ignored when the debugger
                     // has forced viewing a particular framebuffer.

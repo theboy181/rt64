@@ -65,7 +65,7 @@ namespace RT64 {
 
     UserConfiguration::UserConfiguration() {
         graphicsAPI = GraphicsAPI::Automatic;
-        resolution = Resolution::WindowIntegerScale;
+        resolution = Resolution::Original;
         displayBuffering = DisplayBuffering::Double;
         antialiasing = Antialiasing::None;
         resolutionMultiplier = 2.0f;
@@ -75,7 +75,7 @@ namespace RT64 {
         aspectTarget = 16.0f / 9.0f;
         extAspectRatio = AspectRatio::Original;
         extAspectTarget = 16.0f / 9.0f;
-        upscale2D = Upscale2D::ScaledOnly;
+        upscale2D = Upscale2D::Original;
         threePointFiltering = true;
         refreshRate = RefreshRate::Original;
         refreshRateTarget = 60;

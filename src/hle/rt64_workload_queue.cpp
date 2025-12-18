@@ -7,6 +7,7 @@
 #include "common/rt64_thread.h"
 
 #include "rt64_present_queue.h"
+#include "render/rt64_vi_renderer.h"
 
 #define ENABLE_HIGH_RESOLUTION_RENDERER 1
 
@@ -188,6 +189,14 @@ namespace RT64 {
             }
             else {
                 resolutionMultiplier = 1.0f;
+            }
+
+            // CRT scanlines can become too subtle at very high auto scales (e.g. 4K+ windows).
+            // Clamp auto scaling to ~1080p height when CRT is enabled to keep the effect visible.
+            if (getCrtScanlinesEnabled()) {
+                constexpr float MaxCrtAutoHeight = 1080.0f;
+                const float maxMultiplier = std::max(MaxCrtAutoHeight / float(ReferenceHeight), 1.0f);
+                resolutionMultiplier = std::min(resolutionMultiplier, maxMultiplier);
             }
 
             break;

@@ -46,6 +46,8 @@
 #include "shaders/TextureResolveSamples8XPS.hlsl.spirv.h"
 #include "shaders/VideoInterfacePSRegular.hlsl.spirv.h"
 #include "shaders/VideoInterfacePSPixel.hlsl.spirv.h"
+#include "shaders/VideoInterfacePSRegularCRT.hlsl.spirv.h"
+#include "shaders/VideoInterfacePSPixelCRT.hlsl.spirv.h"
 #include "shaders/FullScreenVS.hlsl.spirv.h"
 #include "shaders/Im3DVS.hlsl.spirv.h"
 #include "shaders/ComposePS.hlsl.spirv.h"
@@ -92,6 +94,8 @@
 #   include "shaders/TextureResolveSamples8XPS.hlsl.dxil.h"
 #   include "shaders/VideoInterfacePSRegular.hlsl.dxil.h"
 #   include "shaders/VideoInterfacePSPixel.hlsl.dxil.h"
+#   include "shaders/VideoInterfacePSRegularCRT.hlsl.dxil.h"
+#   include "shaders/VideoInterfacePSPixelCRT.hlsl.dxil.h"
 #   include "shaders/FullScreenVS.hlsl.dxil.h"
 #   include "shaders/Im3DVS.hlsl.dxil.h"
 #   include "shaders/ComposePS.hlsl.dxil.h"
@@ -137,6 +141,8 @@
 #   include "shaders/TextureResolveSamples8XPS.hlsl.metal.h"
 #   include "shaders/VideoInterfacePSRegular.hlsl.metal.h"
 #   include "shaders/VideoInterfacePSPixel.hlsl.metal.h"
+#   include "shaders/VideoInterfacePSRegularCRT.hlsl.metal.h"
+#   include "shaders/VideoInterfacePSPixelCRT.hlsl.metal.h"
 #   include "shaders/FullScreenVS.hlsl.metal.h"
 #   include "shaders/Im3DVS.hlsl.metal.h"
 #   include "shaders/ComposePS.hlsl.metal.h"
@@ -587,14 +593,18 @@ namespace RT64 {
         {
             std::unique_ptr<RenderShader> regularShader = device->createShader(CREATE_SHADER_INPUTS(VideoInterfacePSRegularBlobDXIL, VideoInterfacePSRegularBlobSPIRV, VideoInterfacePSRegularBlobMSL, "PSMain", shaderFormat));
             std::unique_ptr<RenderShader> pixelShader = device->createShader(CREATE_SHADER_INPUTS(VideoInterfacePSPixelBlobDXIL, VideoInterfacePSPixelBlobSPIRV, VideoInterfacePSPixelBlobMSL, "PSMain", shaderFormat));
+            std::unique_ptr<RenderShader> regularCrtShader = device->createShader(CREATE_SHADER_INPUTS(VideoInterfacePSRegularCRTBlobDXIL, VideoInterfacePSRegularCRTBlobSPIRV, VideoInterfacePSRegularCRTBlobMSL, "PSMain", shaderFormat));
+            std::unique_ptr<RenderShader> pixelCrtShader = device->createShader(CREATE_SHADER_INPUTS(VideoInterfacePSPixelCRTBlobDXIL, VideoInterfacePSPixelCRTBlobSPIRV, VideoInterfacePSPixelCRTBlobMSL, "PSMain", shaderFormat));
 
             VideoInterfaceDescriptorSet nearestDescriptorSet(samplerLibrary.nearest.borderBorder.get());
             VideoInterfaceDescriptorSet linearDescriptorSet(samplerLibrary.linear.borderBorder.get());
+
             layoutBuilder.begin();
             layoutBuilder.addPushConstant(0, 0, sizeof(interop::VideoInterfaceCB), RenderShaderStageFlag::PIXEL);
             layoutBuilder.addDescriptorSet(nearestDescriptorSet);
             layoutBuilder.end();
             videoInterfaceNearest.pipelineLayout = layoutBuilder.create(device);
+            videoInterfaceNearestCRT.pipelineLayout = layoutBuilder.create(device);
 
             RenderGraphicsPipelineDesc pipelineDesc;
             pipelineDesc.vertexShader = fullScreenVertexShader.get();
@@ -605,19 +615,34 @@ namespace RT64 {
             pipelineDesc.pipelineLayout = videoInterfaceNearest.pipelineLayout.get();
             videoInterfaceNearest.pipeline = device->createGraphicsPipeline(pipelineDesc);
 
+            pipelineDesc.pixelShader = regularCrtShader.get();
+            pipelineDesc.pipelineLayout = videoInterfaceNearestCRT.pipelineLayout.get();
+            videoInterfaceNearestCRT.pipeline = device->createGraphicsPipeline(pipelineDesc);
+
             layoutBuilder.begin();
             layoutBuilder.addPushConstant(0, 0, sizeof(interop::VideoInterfaceCB), RenderShaderStageFlag::PIXEL);
             layoutBuilder.addDescriptorSet(linearDescriptorSet);
             layoutBuilder.end();
             videoInterfaceLinear.pipelineLayout = layoutBuilder.create(device);
             videoInterfacePixel.pipelineLayout = layoutBuilder.create(device);
+            videoInterfaceLinearCRT.pipelineLayout = layoutBuilder.create(device);
+            videoInterfacePixelCRT.pipelineLayout = layoutBuilder.create(device);
 
             pipelineDesc.pipelineLayout = videoInterfaceLinear.pipelineLayout.get();
+            pipelineDesc.pixelShader = regularShader.get();
             videoInterfaceLinear.pipeline = device->createGraphicsPipeline(pipelineDesc);
 
             pipelineDesc.pixelShader = pixelShader.get();
             pipelineDesc.pipelineLayout = videoInterfacePixel.pipelineLayout.get();
             videoInterfacePixel.pipeline = device->createGraphicsPipeline(pipelineDesc);
+
+            pipelineDesc.pixelShader = regularCrtShader.get();
+            pipelineDesc.pipelineLayout = videoInterfaceLinearCRT.pipelineLayout.get();
+            videoInterfaceLinearCRT.pipeline = device->createGraphicsPipeline(pipelineDesc);
+
+            pipelineDesc.pixelShader = pixelCrtShader.get();
+            pipelineDesc.pipelineLayout = videoInterfacePixelCRT.pipelineLayout.get();
+            videoInterfacePixelCRT.pipeline = device->createGraphicsPipeline(pipelineDesc);
         }
     }
 

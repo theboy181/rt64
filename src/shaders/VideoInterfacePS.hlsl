@@ -21,6 +21,46 @@ float4 SampleInput(float2 uv) {
     return gammaCorrectedColor;
 }
 
+#ifdef CRT_EFFECT
+float3 ApplyCrt(float3 rgb, float2 uvNorm) {
+    // Entire CRT overlay is gated by bit 0.
+    if ((gConstants.viFlags & 1u) == 0u) {
+        return rgb;
+    }
+
+    // Drive the CRT mask by the VI's effective resolution, but clamp to at least 1280x960 (2x 640x480)
+    // to keep scanlines/triads from looking too low-res at 1x.
+    float crtGridW = max(round(gConstants.videoResolution.x), 640.0f);
+    float crtGridH = max(round(gConstants.videoResolution.y), 480.0f);
+
+    float2 uvSat = saturate(uvNorm);
+    float xFine = uvSat.x * crtGridW;
+    float yFine = uvSat.y * crtGridH;
+
+    uint crtX = (uint)floor(xFine);
+    uint crtY = (uint)floor(yFine);
+
+    // Smooth scanlines (cosine-shaped), alternating every line at the target grid.
+    const float pi = 3.14159265f;
+    float scanStrength = 0.50f;
+    float scan = 1.0f - scanStrength * (0.5f + 0.5f * cos(pi * yFine));
+    rgb *= scan;
+
+    float triad = float(crtX % 3u);
+    float3 mask =
+        (triad < 1.0f) ? float3(1.05f, 0.95f, 0.95f) :
+        (triad < 2.0f) ? float3(0.95f, 1.05f, 0.95f) :
+                         float3(0.95f, 0.95f, 1.05f);
+    rgb *= lerp(1.0f.xxx, mask, 0.25f);
+
+    float2 v = uvNorm * (1.0f - uvNorm);
+    float vignette = saturate(16.0f * v.x * v.y);
+    rgb *= lerp(0.90f, 1.0f, vignette);
+
+    return rgb;
+}
+#endif
+
 //
 // Sourced from https://www.shadertoy.com/view/csX3RH
 //
@@ -33,9 +73,27 @@ float4 PixelAntialiasing(float2 uv) {
 }
 
 float4 PSMain(in float4 pos : SV_Position, in float2 uv : TEXCOORD0) : SV_TARGET {
+    // Fullscreen triangle UVs are set to 0..2 at the vertices, but interpolate to 0..1 over the viewport.
+    float2 uvNorm = uv;
+
+    // Horizontal overscan crop (in output screen pixels) to hide edge artifacts (GlideN64-style).
+    // Crops `cropPixels` from both the left and right sides, regardless of VI resolution.
+    const float cropPixels = 20.0f;
+    float viewportWidth = max(round(rcp(fwidth(uv.x))), 1.0f);
+    float crop = cropPixels / viewportWidth;
+    uvNorm.x = uvNorm.x * (1.0f - 2.0f * crop) + crop;
+    float2 uvCropped = uvNorm;
 #ifdef PIXEL_ANTIALIASING
-    return PixelAntialiasing(uv);
+    float4 color = PixelAntialiasing(uvCropped);
+#ifdef CRT_EFFECT
+    color.rgb = ApplyCrt(color.rgb, uvNorm);
+#endif
+    return color;
 #else
-    return SampleInput((uv / gConstants.textureResolution) * gConstants.videoResolution);
+    float4 color = SampleInput((uvCropped / gConstants.textureResolution) * gConstants.videoResolution);
+#ifdef CRT_EFFECT
+    color.rgb = ApplyCrt(color.rgb, uvNorm);
+#endif
+    return color;
 #endif
 }
